@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+    />
+    <link rel="shortcut icon" href="#" />
+
+    <title>License Plate Reader</title>
+
+    <link rel="stylesheet" href="../static/style.css" />
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div class="container">
+      <div class="form-container">
+        <h1>Upload any image or video</h1>
+        <form class="form-signin" method="post" enctype="multipart/form-data" name="form1">
+          <input type="file" name="file" class="form-control-file" id="inputfile" />
+          <button class="btn btn-lg btn-primary btn-block" type="submit">Upload</button>
+          <div class="progress-container">
+            <div class="progress-bar" id="progress-bar"></div>
+          </div>
+        </form>
+        <p class="mt-5 mb-3 text-muted">Built using Pytorch & Flask</p>
+      </div>
+      <div class="preview-container">
+        <h2>Image Preview</h2>
+        <img id="preview-image" class="preview-image" src="#" alt="Preview Image" />
+      </div>
+      <div class="preview-container">
+        <h2>Result Preview</h2>
+        <img id="result-image" class="preview-image" src="" alt="Result Image" />
+      </div>
+    </div>
+
+    <script src="../static/script.js"></script>
+  </body>
+</html>
