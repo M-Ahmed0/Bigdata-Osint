@@ -49,33 +49,58 @@ def predict_with_yolov5():
                 # storing the uploaded file by the user in upload folder
                 basepath = os.path.dirname(__file__)
                 filepath = os.path.join(basepath, 'uploads', f.filename)
+                file_extension = f.filename.rsplit('.', 1)[1].lower()
+                print("upload folder is ", filepath)
+                f.save(filepath)
 
-                image = cv2.imread(filepath)
-
-                results = yolov5_model(image)
-                # print(" sssssssssssssssssssss",results.pandas().xyxy[0]['xmin'])
-                pred_boxes = results.xyxy[0].detach().numpy()
-                image_drawn = image.copy()
-                for box in pred_boxes:
-                    xmin, ymin, xmax, ymax, conf, cls = box
-                    print("xmin", xmin, "ymin",ymin, "xmax", xmax, "ymax", ymax) 
-                    xmin, ymin, xmax, ymax = int(xmin), int(ymin), int(xmax), int(ymax)
-                    cv2.rectangle(image_drawn, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2) # draw green rectangle
-
-                # Save the drawn image as PNG
-                output_path = 'test.png'
-                cv2.imwrite(output_path, cv2.cvtColor(image_drawn, cv2.COLOR_RGB2BGR))
-                # for im in results.ims:
-                #     cv2.rectangle(im, (results.pandas().xyxy[0]['xmin'].astype(int), results.pandas().xyxy[0]['ymin'].astype(int)), (results.pandas().xyxy[0]['xmax'].astype(int), results.pandas().xyxy[0]['ymax'].astype(int)), (0, 255, 0), 2) # draw green rectangle
-                # print(results)
-                print("xyxy ", results.pandas().xyxy[0])
-                # response = {
-                #     'predictions': results.pandas().xyxy[0].to_dict(orient='records'),
-                #     'annotated_image': results.render().tolist()
-                # }
-                # print(jsonify(response))
+                image = cv2.imread(f)
+                print("image ----------", image)
+                if file_extension == 'jpg':
+                    image_drawn = brand_predict(image)
+                    image_drawn = license_predict(image_drawn)
+                elif file_extension == 'mp4':
+                    print("Videos are not supported yet, come back later")
         
     return render_template('index.html')
+
+def brand_predict(image):
+    results = yolov5_model(image)
+    pred_boxes = results.xyxy[0].detach().numpy()
+    image_drawn = image.copy()
+    for box in pred_boxes:
+        xmin, ymin, xmax, ymax, conf, cls = box
+        print("xmin", xmin, "ymin",ymin, "xmax", xmax, "ymax", ymax) 
+        xmin, ymin, xmax, ymax = int(xmin), int(ymin), int(xmax), int(ymax)
+        cv2.rectangle(image_drawn, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2) # draw green rectangle
+
+
+    return image_drawn
+
+def license_predict(image):
+
+    detections = yolo.predict(image)  
+    license_plate,image_drawn = process_results(detections,image)
+
+    app_token = 'vFOK1jHTLo7llP150mPktYWgJ'
+    vehicle_data = get_vehicle_data(license_plate, app_token)
+    # Save the drawn image as PNG ----- testing purposes
+    output_path = 'test.png'
+    cv2.imwrite(output_path, cv2.cvtColor(image_drawn, cv2.COLOR_RGB2BGR))
+    return image
+
+def get_vehicle_data(license_plate, app_token): 
+    base_url = 'https://opendata.rdw.nl/resource/m9d7-ebf2.json' 
+    params = { 'kenteken': license_plate.replace("-", ""), '$$app_token': app_token } 
+    try: 
+        response = requests.get(base_url, params=params) 
+        response.raise_for_status() # Raise an exception for 4xx or 5xx errors 
+        data = response.json() 
+        print("license_plate",license_plate.replace("-", ""))
+        print("json",data)
+        return data 
+    except requests.exceptions.RequestException as e: 
+        print(f"An error occurred: {e}")
+
 
 
 @app.route('/yolov8', methods=['POST', 'GET'])
@@ -91,9 +116,6 @@ def predict_img():
             print("upload folder is ", filepath)
             f.save(filepath)
             
-            global imgpath
-            predict_img.imgpath = f.filename
-            print("printing predict_img :::::: ", predict_img)
 
             file_extension = f.filename.rsplit('.', 1)[1].lower()
               
@@ -124,7 +146,7 @@ def predict_img():
 reader = easyocr.Reader(['en'] , gpu = True)
 
 # ---- process all the results by enhancing the pixels and performing OCR to read the license plates.
-def process_results(results):
+def process_results(results, image):
     
 
     for r in results:
@@ -142,10 +164,7 @@ def process_results(results):
             
             # Apply threshold
             thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
-            # plt.imshow(thresh)
-            # plt.show()
-            
-            
+                        
             #ocr
             result = reader.readtext(thresh)    
                 
@@ -159,16 +178,12 @@ def process_results(results):
                     text = res[1]
 
             print(text)
-
                    
-            cv2.rectangle(r.orig_img, (x, y), (w, h), (0, 255, 0), 2) # draw green rectangle
+            cv2.rectangle(image, (x, y), (w, h), (0, 255, 0), 2) # draw green rectangle
             
-            cv2.putText(r.orig_img, text, (x-10, y-10),cv2.FONT_HERSHEY_SIMPLEX, 1.5,(0, 255, 0), 2) # add green text
-            plt.imshow(r.orig_img)
-            # return plt.imshow(r.orig_img)
-            
-            plt.show()
-            return text
+            cv2.putText(image, text, (x-10, y-10),cv2.FONT_HERSHEY_SIMPLEX, 1.5,(0, 255, 0), 2) # add green text
+
+            return (text,image)
 
 
 
