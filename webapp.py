@@ -49,23 +49,36 @@ def predict_with_yolov5():
                 # storing the uploaded file by the user in upload folder
                 basepath = os.path.dirname(__file__)
                 filepath = os.path.join(basepath, 'uploads', f.filename)
-                print("upload folder is ", filepath)
-                f.save(filepath)
 
                 image = cv2.imread(filepath)
 
                 results = yolov5_model(image)
-                
-                response = {
-                    'predictions': results.pandas().xyxy[0].to_dict(orient='records'),
-                    'annotated_image': results.render().tolist()
-                }
-                print(jsonify(response))
+                # print(" sssssssssssssssssssss",results.pandas().xyxy[0]['xmin'])
+                pred_boxes = results.xyxy[0].detach().numpy()
+                image_drawn = image.copy()
+                for box in pred_boxes:
+                    xmin, ymin, xmax, ymax, conf, cls = box
+                    print("xmin", xmin, "ymin",ymin, "xmax", xmax, "ymax", ymax) 
+                    xmin, ymin, xmax, ymax = int(xmin), int(ymin), int(xmax), int(ymax)
+                    cv2.rectangle(image_drawn, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2) # draw green rectangle
+
+                # Save the drawn image as PNG
+                output_path = 'test.png'
+                cv2.imwrite(output_path, cv2.cvtColor(image_drawn, cv2.COLOR_RGB2BGR))
+                # for im in results.ims:
+                #     cv2.rectangle(im, (results.pandas().xyxy[0]['xmin'].astype(int), results.pandas().xyxy[0]['ymin'].astype(int)), (results.pandas().xyxy[0]['xmax'].astype(int), results.pandas().xyxy[0]['ymax'].astype(int)), (0, 255, 0), 2) # draw green rectangle
+                # print(results)
+                print("xyxy ", results.pandas().xyxy[0])
+                # response = {
+                #     'predictions': results.pandas().xyxy[0].to_dict(orient='records'),
+                #     'annotated_image': results.render().tolist()
+                # }
+                # print(jsonify(response))
         
     return render_template('index.html')
 
 
-@app.route('/', methods=['POST', 'GET'])
+@app.route('/yolov8', methods=['POST', 'GET'])
 def predict_img():
     if request.method == "POST":
         if 'file' in request.files:
@@ -94,7 +107,7 @@ def predict_img():
                 # model
                 detections = yolo.predict(image)      
                 # here maybe add function to read the license plate using OCR 
-                print('YOLO v5 detections', detections)
+                print('YOLO v8 detections', detections)
 
                 # return process_results(detections)
                 
