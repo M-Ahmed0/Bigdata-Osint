@@ -31,14 +31,38 @@ app = Flask(__name__)
 def hello_world():
     return render_template('index.html')
 
-
-
- # loading the model
+ # loading yolov8 model
 yolo = YOLO('LP_model_best.pt')
 
- # loading yolov5  model
-# yolo = YOLO('200_epoch_adam_brand_detection.pt')
+#loading yolov5 model (device prob not needed, but ill leave it here for now)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+yolov5_model = torch.hub.load('ultralytics/yolov5', 'custom', path='200_epoch_adam_brand_detection.pt', force_reload=True)
+yolov5_model = yolov5_model.to(device)
 
+
+@app.route('/', methods=['POST', 'GET'])
+def predict_with_yolov5():
+    if request.method == "POST":
+        if 'file' in request.files:
+                #getting the file name and storing in "f" variable
+                f = request.files['file']
+                # storing the uploaded file by the user in upload folder
+                basepath = os.path.dirname(__file__)
+                filepath = os.path.join(basepath, 'uploads', f.filename)
+                print("upload folder is ", filepath)
+                f.save(filepath)
+
+                image = cv2.imread(filepath)
+
+                results = yolov5_model(image)
+                
+                response = {
+                    'predictions': results.pandas().xyxy[0].to_dict(orient='records'),
+                    'annotated_image': results.render().tolist()
+                }
+                print(jsonify(response))
+        
+    return render_template('index.html')
 
 
 @app.route('/', methods=['POST', 'GET'])
