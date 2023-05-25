@@ -2,23 +2,13 @@ document.addEventListener("DOMContentLoaded", function() {
     const form = document.querySelector("form");
     const progressBar = document.querySelector(".progress-bar");
     const previewContainer = document.querySelector(".preview-container");
+    
     const resultImage = document.getElementById("result-image");
-    const fileInput = document.getElementById("inputfile");
-
-    let previousFile;
-    // Reset the progress bar when a new file is selected
-    fileInput.addEventListener("change", function() {
-      const currentFile = fileInput.files[0];
   
-      if (previousFile && currentFile && previousFile.name !== currentFile.name)
-        progressBar.style.width = "0%";
-  
-      previousFile = currentFile;
-    });
-
     form.addEventListener("submit", function(e) {
       e.preventDefault();
   
+      const fileInput = document.getElementById("inputfile");
       const file = fileInput.files[0];
   
       const formData = new FormData();
@@ -54,7 +44,6 @@ document.addEventListener("DOMContentLoaded", function() {
         // Reset the form and progress bar
         form.reset();
         progressBar.style.width = "0%";
-        fileInput.value = "";
       };
   
       // Send the form data to the server
