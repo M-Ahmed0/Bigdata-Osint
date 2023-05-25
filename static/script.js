@@ -40,9 +40,10 @@ document.addEventListener("DOMContentLoaded", function() {
           // Handle the error response
           console.error(xhr.statusText);
         }
-  
-        // Reset the form and progress bar
-        form.reset();
+      };
+
+      xhr.onloadend = function() {
+        // Reset the progress bar
         progressBar.style.width = "0%";
       };
   
