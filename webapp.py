@@ -53,15 +53,22 @@ def predict_with_yolov5():
                 print("upload folder is ", filepath)
                 f.save(filepath)
 
-                image = cv2.imread(f)
+                image = cv2.imread(filepath)
                 print("image ----------", image)
-                if file_extension == 'jpg':
+                
+                if is_valid_file_extension(file_extension):
                     image_drawn = brand_predict(image)
                     image_drawn = license_predict(image_drawn)
-                elif file_extension == 'mp4':
-                    print("Videos are not supported yet, come back later")
+                else:
+                    print("Sorry, but this is not a supported format.")
         
     return render_template('index.html')
+
+
+def is_valid_file_extension(file_extension):
+    valid_extensions = ['jpg', 'png', 'mp4', 'mov', 'avi']
+    return file_extension in valid_extensions
+
 
 def brand_predict(image):
     results = yolov5_model(image)
