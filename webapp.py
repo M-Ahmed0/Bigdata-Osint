@@ -38,7 +38,7 @@ yolo = YOLO('LP_model_best.pt')
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 yolov5_model = torch.hub.load('ultralytics/yolov5', 'custom', path='200_epoch_adam_brand_detection.pt', force_reload=True)
 yolov5_model = yolov5_model.to(device)
-
+app_token = 'vFOK1jHTLo7llP150mPktYWgJ'
 
 @app.route('/', methods=['POST', 'GET'])
 def predict_with_yolov5():
@@ -61,6 +61,9 @@ def predict_with_yolov5():
                     image_drawn = license_predict(image_drawn)
                 else:
                     print("Sorry, but this is not a supported format.")
+                
+                # Delete the file after processing
+                os.remove(filepath)
         
     return render_template('index.html')
 
@@ -88,8 +91,6 @@ def license_predict(image):
     detections = yolo.predict(image)  
     license_plate,image_drawn = process_results(detections,image)
 
-    app_token = 'vFOK1jHTLo7llP150mPktYWgJ'
-    vehicle_data = get_vehicle_data(license_plate, app_token)
     # Save the drawn image as PNG ----- testing purposes
     output_path = 'test.png'
     cv2.imwrite(output_path, cv2.cvtColor(image_drawn, cv2.COLOR_RGB2BGR))
@@ -97,12 +98,12 @@ def license_predict(image):
 
 def get_vehicle_data(license_plate, app_token): 
     base_url = 'https://opendata.rdw.nl/resource/m9d7-ebf2.json' 
-    params = { 'kenteken': license_plate.replace("-", ""), '$$app_token': app_token } 
+    params = { 'kenteken': license_plate, '$$app_token': app_token } 
     try: 
         response = requests.get(base_url, params=params) 
         response.raise_for_status() # Raise an exception for 4xx or 5xx errors 
         data = response.json() 
-        print("license_plate",license_plate.replace("-", ""))
+        print("license_plate",license_plate)
         print("json",data)
         return data 
     except requests.exceptions.RequestException as e: 
@@ -155,7 +156,6 @@ reader = easyocr.Reader(['en'] , gpu = True)
 # ---- process all the results by enhancing the pixels and performing OCR to read the license plates.
 def process_results(results, image):
     
-
     for r in results:
         boxes = r.boxes
         for box in boxes:
@@ -171,29 +171,42 @@ def process_results(results, image):
             
             # Apply threshold
             thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
-                        
-            #ocr
-            result = reader.readtext(thresh)    
+                           
                 
-            text = ""
-        
-            for res in result:
-                if len(result) == 1:
-                    text = res[1]
-        
-                if len(result) > 1 and len(res[1]) > 6 and res[2] > 0.2:
-                    text = res[1]
+            text = read_text_ocr(thresh)
 
-            print(text)
+            vehicle_data = get_vehicle_data(text.replace("-", ""), app_token)
+            if vehicle_data=="":
+                # Create a kernel for dilation and erosion
+                kernel = np.ones((5, 5), np.uint8)  # Adjust the kernel size as needed
+                # Apply dilation
+                dilated_image = cv2.dilate(img, kernel, iterations=1)
+                # Apply erosion
+                eroded_image = cv2.erode(dilated_image, kernel, iterations=1)
+                #ocr
+                text = read_text_ocr(eroded_image)
+
+            print(text.replace("-", ""))
                    
             cv2.rectangle(image, (x, y), (w, h), (0, 255, 0), 2) # draw green rectangle
             
-            cv2.putText(image, text, (x-10, y-10),cv2.FONT_HERSHEY_SIMPLEX, 1.5,(0, 255, 0), 2) # add green text
+            cv2.putText(image, text.replace("-", ""), (x-10, y-10),cv2.FONT_HERSHEY_SIMPLEX, 1.5,(0, 255, 0), 2) # add green text
 
             return (text,image)
 
 
-
+def read_text_ocr(img):
+    #ocr
+    result = reader.readtext(img)                   
+    text = ""
+        
+    for res in result:
+        if len(result) == 1:
+            text = res[1]
+        
+        if len(result) > 1 and len(res[1]) > 6 and res[2] > 0.2:
+            text = res[1]
+    return text
 #---------------------------------------------------------------------------------------------------------------------------------------#
 # # function to display the detected objects video on html page
 # @app.route("/video_feed")
