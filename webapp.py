@@ -20,7 +20,7 @@ import glob
 from flask import jsonify
 import matplotlib.pyplot as plt
 import easyocr
-
+from io import BytesIO
 
 from ultralytics import YOLO
 
@@ -51,19 +51,28 @@ def predict_with_yolov5():
                 filepath = os.path.join(basepath, 'uploads', f.filename)
                 file_extension = f.filename.rsplit('.', 1)[1].lower()
                 print("upload folder is ", filepath)
-                f.save(filepath)
 
-                image = cv2.imread(filepath)
+                # save the image as a memory stream
+                stream = BytesIO()
+                stream.write(f.read())
+
+                # Reset the stream position to the beginning
+                stream.seek(0)
+
+                image = cv2.imdecode(np.frombuffer(stream.read(), np.uint8), cv2.IMREAD_COLOR)
                 print("image ----------", image)
-                
+
                 if is_valid_file_extension(file_extension):
                     image_drawn = brand_predict(image)
                     image_drawn = license_predict(image_drawn)
                 else:
                     print("Sorry, but this is not a supported format.")
+
+                # remove the image file from the server
+                f.close()
+                stream.close()
+
                 
-                # Delete the file after processing
-                os.remove(filepath)
         
     return render_template('index.html')
 
