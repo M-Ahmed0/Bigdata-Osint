@@ -62,11 +62,15 @@ def predict_with_yolov5():
                 image = cv2.imdecode(np.frombuffer(stream.read(), np.uint8), cv2.IMREAD_COLOR)
                 print("image ----------", image)
 
-                if is_valid_file_extension(file_extension):
+                validated_extension = validate_file_extension(file_extension)
+
+                if validated_extension == 'image':
                     image_drawn = brand_predict(image)
                     image_drawn = license_predict(image_drawn)
+                elif validated_extension == 'video':
+                    print("Video still need to be implemented")
                 else:
-                    print("Sorry, but this is not a supported format.")
+                    print("Sorry, this extension is not supported.")
 
                 # remove the image file from the server
                 f.close()
@@ -76,10 +80,14 @@ def predict_with_yolov5():
         
     return render_template('index.html')
 
+def validate_file_extension(file_extension):
+    image_extensions = ['jpeg', 'jpg', 'png']
+    video_extensions = ['mp4', 'mov', 'avi']
 
-def is_valid_file_extension(file_extension):
-    valid_extensions = ['jpg', 'png', 'mp4', 'mov', 'avi']
-    return file_extension in valid_extensions
+    if file_extension in image_extensions:
+        return "image"
+    elif file_extension in video_extensions:
+        return "video"
 
 
 def brand_predict(image):
