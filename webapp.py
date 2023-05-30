@@ -21,15 +21,27 @@ from flask import jsonify
 import matplotlib.pyplot as plt
 import easyocr
 
+from vehicle_dto import VehicleDTO
 
 from ultralytics import YOLO
 
 app = Flask(__name__)
 
 
-@app.route("/")
-def hello_world():
-    return render_template('index.html')
+
+# Route for processing the uploaded image and displaying the result
+@app.route('/', methods=['GET', 'POST'])
+def index():
+
+    app_token = 'vFOK1jHTLo7llP150mPktYWgJ'
+    vehicle = get_vehicle_data('H264FZ', app_token)
+    # Render the index.html template and pass the vehicle data to it
+    return render_template("index.html", vehicle=vehicle)
+
+
+# @app.route("/")
+# def hello_world():
+#     return render_template('index.html')
 
  # loading yolov8 model
 yolo = YOLO('LP_model_best.pt')
@@ -58,6 +70,8 @@ def predict_with_yolov5():
                 if file_extension == 'jpg':
                     image_drawn = brand_predict(image)
                     image_drawn = license_predict(image_drawn)
+
+                    
                 elif file_extension == 'mp4':
                     print("Videos are not supported yet, come back later")
         
@@ -89,18 +103,64 @@ def license_predict(image):
     return image
 
 def get_vehicle_data(license_plate, app_token): 
+
+    # """
+    # Retrieve vehicle data from the API based on the provided license plate and app token.
+
+    # Args:
+    #     license_plate (str): The license plate of the vehicle.
+    #     app_token (str): The application token for accessing the API.
+
+    # Returns:
+    #     list: The extracted information for the vehicle.
+    # """
+
     base_url = 'https://opendata.rdw.nl/resource/m9d7-ebf2.json' 
     params = { 'kenteken': license_plate.replace("-", ""), '$$app_token': app_token } 
     try: 
         response = requests.get(base_url, params=params) 
         response.raise_for_status() # Raise an exception for 4xx or 5xx errors 
         data = response.json() 
+             
+
+        for item in data:
+            license_plate: item.get('kenteken')
+            brand: item.get('merk')
+            apk_expiry_date: item.get('vervaldatum_apk')
+
+    
+
+        # Create an instance of the VehicleDTO with the extracted information
+        vehicle = VehicleDTO(license_plate, brand, apk_expiry_date)
+
         print("license_plate",license_plate.replace("-", ""))
-        print("json",data)
-        return data 
+        print("json",extracted_data)
+        return vehicle 
     except requests.exceptions.RequestException as e: 
         print(f"An error occurred: {e}")
 
+
+
+def extract_information(vehicle_data):
+    """
+    Extract specific information from the JSON data.
+
+    Args:
+        vehicle_data (list): The JSON data containing vehicle information.
+
+    Returns:
+        list: The extracted information for each vehicle.
+    """
+    extracted_data = []
+    for item in vehicle_data:
+        extracted_item = {
+            'kenteken': item.get('kenteken'),
+            'merk': item.get('merk'),
+            'vervaldatum_apk': item.get('vervaldatum_apk')
+        }
+        extracted_data.append(extracted_item)
+
+    return extracted_data
 
 
 @app.route('/yolov8', methods=['POST', 'GET'])
@@ -187,6 +247,8 @@ def process_results(results, image):
 
 
 
+if __name__ == '__main__':
+    app.run()
 #---------------------------------------------------------------------------------------------------------------------------------------#
 # # function to display the detected objects video on html page
 # @app.route("/video_feed")
