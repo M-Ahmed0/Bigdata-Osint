@@ -21,6 +21,7 @@ from flask import jsonify
 import matplotlib.pyplot as plt
 import easyocr
 from io import BytesIO
+from collections import Counter
 
 from ultralytics import YOLO
 
@@ -65,10 +66,10 @@ def predict_with_yolov5():
                 validated_extension = validate_file_extension(file_extension)
 
                 if validated_extension == 'image':
-                    image_drawn = brand_predict(image)
+                    image_drawn, bounding_boxes, classes = brand_predict(image)
                     image_drawn = license_predict(image_drawn)
                 elif validated_extension == 'video':
-                    print("Video still need to be implemented")
+                    test = process_brand_video("test.mp4")
                 else:
                     print("Sorry, this extension is not supported.")
 
@@ -93,15 +94,53 @@ def validate_file_extension(file_extension):
 def brand_predict(image):
     results = yolov5_model(image)
     pred_boxes = results.xyxy[0].detach().numpy()
+
+    bounding_boxes = []
+    classes = []
+
     image_drawn = image.copy()
     for box in pred_boxes:
         xmin, ymin, xmax, ymax, conf, cls = box
         print("xmin", xmin, "ymin",ymin, "xmax", xmax, "ymax", ymax) 
         xmin, ymin, xmax, ymax = int(xmin), int(ymin), int(xmax), int(ymax)
+
+        bounding_boxes.append((xmin, ymin, xmax, ymax))
+        classes.append(cls)
+
         cv2.rectangle(image_drawn, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2) # draw green rectangle
 
 
-    return image_drawn
+    return image_drawn, bounding_boxes, classes
+
+def process_brand_video(video_path):
+    # Open the video file
+    video = cv2.VideoCapture(video_path)
+
+    processed_frames = []
+    class_count = Counter()
+
+    while True:
+        # Read the current frame from the video
+        ret, frame = video.read()
+
+        # Break the loop if no frame is available
+        if not ret:
+            break
+
+        # Perform object detection and draw bounding boxes on the frame
+        processed_frame, bounding_boxes, classes = brand_predict(frame)
+
+        # Collect the processed frame and bounding boxes in a list
+        processed_frames.append((processed_frame, bounding_boxes, classes))
+
+        class_count.update(classes)
+
+    # Release the video capture object
+    video.release()
+
+    print('Video processing completed')
+    print(class_count)
+    return processed_frames
 
 def license_predict(image):
 
