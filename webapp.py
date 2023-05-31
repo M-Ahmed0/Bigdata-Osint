@@ -98,11 +98,18 @@ def brand_predict(image):
 
     bounding_boxes = []
 
+    #for class recognition
+    class_names = results.names
+
     image_drawn = image.copy()
     for box in pred_boxes:
         xmin, ymin, xmax, ymax, conf, cls = box
         print("xmin", xmin, "ymin",ymin, "xmax", xmax, "ymax", ymax) 
         xmin, ymin, xmax, ymax = int(xmin), int(ymin), int(xmax), int(ymax)
+
+        # class recognition
+        class_name = class_names[int(cls)]
+        print("Brand detected:", class_name)
 
         bounding_boxes.append((xmin, ymin, xmax, ymax))
 
