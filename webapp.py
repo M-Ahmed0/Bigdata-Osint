@@ -82,6 +82,74 @@ def predict_with_yolov5():
         
     return render_template('index.html')
 
+
+
+
+# predict end point
+
+@app.route('/predict', methods=['POST'])
+def predict():
+     """
+    Endpoint for performing image inference.
+
+    Accepts a POST request with a file upload containing an image.
+    Processes the image and performs inference.
+    Returns the resulting inference image as the response.
+
+    Returns:
+        Flask response: Inference image as the response.
+    """
+    
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file uploaded.'}), 400
+        
+    f = request.files['file']
+    # storing the uploaded file by the user in upload folder
+    basepath = os.path.dirname(__file__)
+    filepath = os.path.join(basepath, 'uploads', f.filename)
+    file_extension = f.filename.rsplit('.', 1)[1].lower()
+    print("upload folder is ", filepath)
+
+    # save the image as a memory stream
+    stream = BytesIO()
+    stream.write(f.read())
+
+    # Reset the stream position to the beginning
+    stream.seek(0)
+
+    image = cv2.imdecode(np.frombuffer(stream.read(), np.uint8), cv2.IMREAD_COLOR)
+    print("image ----------", image)
+
+    validated_extension = validate_file_extension(file_extension)
+
+    if validated_extension == 'image':
+        image_drawn, bounding_boxes = brand_predict(image)
+        image_drawn = license_predict(image_drawn)
+    elif validated_extension == 'video':
+        test = process_brand_video("test.mp4")
+        print(test)
+    else:
+        return jsonify({'error': 'Sorry, this extension is not supported.'}), 406
+
+    # remove the image file from the server
+    f.close()
+    stream.close()
+   
+    # Saving the inference image temporarily
+    output_image_path = 'output/image.jpg'
+    cv2.imwrite(output_image_path, image_drawn)
+
+    # Return the inference image as the response
+    return send_file(output_image_path, mimetype='image/jpeg')
+
+
+
+
+
+
+if __name__ == "__main__":
+    app.run()    
+
 def validate_file_extension(file_extension):
     image_extensions = ['jpeg', 'jpg', 'png']
     video_extensions = ['mp4', 'mov', 'avi']
