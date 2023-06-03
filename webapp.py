@@ -24,7 +24,7 @@ from io import BytesIO
 from collections import Counter
 
 from ultralytics import YOLO
-
+from VehicleDTO import VehicleDTO
 app = Flask(__name__)
 
 
@@ -89,17 +89,7 @@ def predict_with_yolov5():
 
 @app.route('/predict', methods=['POST'])
 def predict():
-     """
-    Endpoint for performing image inference.
 
-    Accepts a POST request with a file upload containing an image.
-    Processes the image and performs inference.
-    Returns the resulting inference image as the response.
-
-    Returns:
-        Flask response: Inference image as the response.
-    """
-    
     if 'file' not in request.files:
         return jsonify({'error': 'No file uploaded.'}), 400
         
@@ -235,9 +225,16 @@ def get_vehicle_data(license_plate, app_token):
         response = requests.get(base_url, params=params) 
         response.raise_for_status() # Raise an exception for 4xx or 5xx errors 
         data = response.json() 
+        print(type(data))
+        vehicle_dto = VehicleDTO.from_json(data)
         print("license_plate",license_plate)
         print("json",data)
-        return data 
+        print(f"vehicle_dto: {vehicle_dto}")
+        print(f"vehicle_dto: {vehicle_dto.license_plate}")
+        print(f"vehicle_dto",vehicle_dto.brand)
+        print(f"vehicle_dto",vehicle_dto.apk_expiry_date)
+        print(f"vehicle_dto",vehicle_dto.veh_registration_nr)
+        return vehicle_dto 
     except requests.exceptions.RequestException as e: 
         print(f"An error occurred: {e}")
 
@@ -340,84 +337,3 @@ def read_text_ocr(img):
             text = res[1]
     return text
 #---------------------------------------------------------------------------------------------------------------------------------------#
-# # function to display the detected objects video on html page
-# @app.route("/video_feed")
-# def video_feed():
-#     return Response(get_frame(),
-#                     mimetype='multipart/x-mixed-replace; boundary=frame')
-
-          
-#     folder_path = 'runs/detect'
-#     subfolders = [f for f in os.listdir(folder_path) if os.path.isdir(os.path.join(folder_path, f))]    
-#     latest_subfolder = max(subfolders, key=lambda x: os.path.getctime(os.path.join(folder_path, x)))    
-#     image_path = folder_path+'/'+latest_subfolder+'/'+f.filename 
-#     return render_template('index.html', image_path=image_path)
-#     #return "done"
-
-
-
-# if __name__ == "__main__":
-#     parser = argparse.ArgumentParser(description="Flask app exposing yolov8 models")
-#     parser.add_argument("--port", default=5000, type=int, help="port number")
-#     args = parser.parse_args()
-#     model = torch.hub.load('.', 'custom','best.pt', source='local')
-#     model.eval()
-#     app.run(host="0.0.0.0", port=args.port)  # debug=True causes Restarting with stat
-
-
-
-# function for accessing rtsp stream
-# @app.route("/rtsp_feed")
-# def rtsp_feed():
-    # cap = cv2.VideoCapture('rtsp://admin:hello123@192.168.29.126:554/cam/realmonitor?channel=1&subtype=0')
-    # return render_template('index.html')
-
-
-# Function to start webcam and detect objects
-
-# @app.route("/webcam_feed")
-# def webcam_feed():
-    # #source = 0
-    # cap = cv2.VideoCapture(0)
-    # return render_template('index.html')
-
-# function to get the frames from video (output video)
-
-
-# @app.route('/', methods=['POST'])
-# def predict_img():
-#     if request.method == "POST":
-#         if 'file' in request.files:
-        
-#             #getting the file name and storing in "f" variable
-#             f = request.files['file']
-#             # storing the uploaded file by the user in upload folder
-#             basepath = os.path.dirname(__file__)
-#             filepath = os.path.join(basepath, 'uploads', f.filename)
-#             print("upload folder is ", filepath)
-#             f.save(filepath)
-            
-#             global imgpath
-#             predict_img.imgpath = f.filename
-#             print("printing predict_img :::::: ", predict_img)
-
-#             file_extension = f.filename.rsplit('.', 1)[1].lower()
-              
-            
-#             if file_extension == 'jpg':
-#                 img = cv2.imread(filepath)
-#                 frame = cv2.imencode('.jpg', cv2.UMat(img))[1].tobytes()
-                
-#                 image = Image.open(io.BytesIO(frame))
-                
-#                 # loading the model and perform the detection
-#                 yolo = YOLO('best.pt')
-#                 detections = yolo.predict(image) # we are also saving the file in the runs folder
-#                 print("fdsfdsg",detections)
-#                 # here maybe add function to read the license plate using OCR 
-                
-#                 return display(f.filename)
-                
-                
-#             elif file_extension == 'mp4':
-#                 print("Videos are not supported yet, come back later")
