@@ -22,11 +22,14 @@ import matplotlib.pyplot as plt
 import easyocr
 from io import BytesIO
 from collections import Counter
-
+from json import dumps as jsonstring
 from ultralytics import YOLO
 from VehicleDTO import VehicleDTO
-app = Flask(__name__)
 
+from flask_cors import CORS 
+import base64
+app = Flask(__name__)
+CORS(app)
 
 @app.route("/")
 def hello_world():
@@ -92,7 +95,8 @@ def predict():
 
     if 'file' not in request.files:
         return jsonify({'error': 'No file uploaded.'}), 400
-        
+    model = request.args.get("model")    
+    print(model)
     f = request.files['file']
     # storing the uploaded file by the user in upload folder
     basepath = os.path.dirname(__file__)
@@ -111,10 +115,17 @@ def predict():
     print("image ----------", image)
 
     validated_extension = validate_file_extension(file_extension)
-
+    vehicle_data1=''
     if validated_extension == 'image':
-        image_drawn, bounding_boxes = brand_predict(image)
-        image_drawn = license_predict(image_drawn)
+        if model=='BRAND':
+            image_drawn, vehicle_data1 = brand_predict(image)
+        elif model == 'LP':
+            image_drawn, vehicle_data = license_predict(image)
+        elif model == 'BOTH':
+            image_drawn, vehicle_data = brand_predict(image)
+            image_drawn, vehicle_data = license_predict(image_drawn)
+        else:
+            return jsonify({'error': 'Sorry, the selected model does not exist.'}), 406
     elif validated_extension == 'video':
         test = process_brand_video("test.mp4")
         print(test)
@@ -130,7 +141,15 @@ def predict():
     cv2.imwrite(output_image_path, image_drawn)
 
     # Return the inference image as the response
-    return send_file(output_image_path, mimetype='image/jpeg')
+    #return jsonify(vehicle_data.__dict__ if not vehicle_data1 else vehicle_data1), 200
+    #return jsonify({'image': image_drawn.tolist()}), 200
+    with open("output/image.jpg", "rb") as image_file:
+        encoded_string = base64.b64encode(image_file.read())
+    try: 
+        return {'image': encoded_string.decode("utf-8"), 'data': jsonstring(vehicle_data.__dict__ if not vehicle_data1 else vehicle_data1)}, 200
+    except: 
+        return {'image': encoded_string.decode("utf-8"), 'data': jsonstring(vehicle_data if not vehicle_data1 else vehicle_data1)}, 200
+    #return send_file(output_image_path, mimetype='image/jpeg')
 
 
 
@@ -172,9 +191,10 @@ def brand_predict(image):
         bounding_boxes.append((xmin, ymin, xmax, ymax))
 
         cv2.rectangle(image_drawn, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2) # draw green rectangle
+        cv2.putText(image_drawn, class_name, (xmin-10, ymin-10),cv2.FONT_HERSHEY_SIMPLEX, 1.5,(0, 255, 0), 2) # add green text
 
 
-    return image_drawn, bounding_boxes
+    return image_drawn, class_name
 
 def process_brand_video(video_path):
 
@@ -211,12 +231,12 @@ def process_brand_video(video_path):
 def license_predict(image):
 
     detections = yolo.predict(image)  
-    license_plate,image_drawn = process_results(detections,image)
+    license_plate,image_drawn,vehicle_data = process_results(detections,image)
 
     # Save the drawn image as PNG ----- testing purposes
     output_path = 'test.png'
     cv2.imwrite(output_path, cv2.cvtColor(image_drawn, cv2.COLOR_RGB2BGR))
-    return image
+    return (image,vehicle_data)
 
 def get_vehicle_data(license_plate, app_token): 
     base_url = 'https://opendata.rdw.nl/resource/m9d7-ebf2.json' 
@@ -225,15 +245,16 @@ def get_vehicle_data(license_plate, app_token):
         response = requests.get(base_url, params=params) 
         response.raise_for_status() # Raise an exception for 4xx or 5xx errors 
         data = response.json() 
-        print(type(data))
+        if len(data) ==0:
+            return data
         vehicle_dto = VehicleDTO.from_json(data)
-        print("license_plate",license_plate)
-        print("json",data)
-        print(f"vehicle_dto: {vehicle_dto}")
-        print(f"vehicle_dto: {vehicle_dto.license_plate}")
-        print(f"vehicle_dto",vehicle_dto.brand)
-        print(f"vehicle_dto",vehicle_dto.apk_expiry_date)
-        print(f"vehicle_dto",vehicle_dto.veh_registration_nr)
+        # print("license_plate",license_plate)
+        # print("json",data)
+        # print(f"vehicle_dto: {vehicle_dto}")
+        # print(f"vehicle_dto: {vehicle_dto.license_plate}")
+        # print(f"vehicle_dto",vehicle_dto.brand)
+        # print(f"vehicle_dto",vehicle_dto.apk_expiry_date)
+        # print(f"vehicle_dto",vehicle_dto.veh_registration_nr)
         return vehicle_dto 
     except requests.exceptions.RequestException as e: 
         print(f"An error occurred: {e}")
@@ -321,7 +342,7 @@ def process_results(results, image):
             
             cv2.putText(image, text.replace("-", ""), (x-10, y-10),cv2.FONT_HERSHEY_SIMPLEX, 1.5,(0, 255, 0), 2) # add green text
 
-            return (text,image)
+            return (text,image,vehicle_data)
 
 
 def read_text_ocr(img):

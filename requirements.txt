@@ -26,3 +26,4 @@ attrs~=23.1.0
 wheel~=0.40.0
 utils~=1.0.1
 setuptools~=67.7.2
+flask-cors~=3.0.10
