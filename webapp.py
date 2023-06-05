@@ -117,7 +117,7 @@ def predict():
     validated_extension = validate_file_extension(file_extension)
     vehicle_data1=''
     if validated_extension == 'image':
-        if model=='BRAND':
+        if model=='BRAND':           
             image_drawn, vehicle_data1 = brand_predict(image)
         elif model == 'LP':
             image_drawn, vehicle_data = license_predict(image)
@@ -127,8 +127,9 @@ def predict():
         else:
             return jsonify({'error': 'Sorry, the selected model does not exist.'}), 406
     elif validated_extension == 'video':
-        test = process_brand_video("test.mp4")
-        print(test)
+        img_arr = process_video_frames_brand("test.mp4")
+        construct_brand_video(img_arr)
+
     else:
         return jsonify({'error': 'Sorry, this extension is not supported.'}), 406
 
@@ -152,10 +153,6 @@ def predict():
     #return send_file(output_image_path, mimetype='image/jpeg')
 
 
-
-
-
-
 if __name__ == "__main__":
     app.run()    
 
@@ -168,13 +165,13 @@ def validate_file_extension(file_extension):
     elif file_extension in video_extensions:
         return "video"
 
-
+# start of brand related code
 def brand_predict(image):
     results = yolov5_model(image)
     pred_boxes = results.xyxy[0].detach().numpy()
 
-    bounding_boxes = []
-
+    class_name = ""
+    
     #for class recognition
     class_names = results.names
 
@@ -188,45 +185,49 @@ def brand_predict(image):
         class_name = class_names[int(cls)]
         print("Brand detected:", class_name)
 
-        bounding_boxes.append((xmin, ymin, xmax, ymax))
-
         cv2.rectangle(image_drawn, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2) # draw green rectangle
         cv2.putText(image_drawn, class_name, (xmin-10, ymin-10),cv2.FONT_HERSHEY_SIMPLEX, 1.5,(0, 255, 0), 2) # add green text
 
-
     return image_drawn, class_name
 
-def process_brand_video(video_path):
 
+
+def process_video_frames_brand(video_path):
     video = cv2.VideoCapture(video_path)
-    processed_frames = []
-    frame_count = 0
 
-    # frames to skip (play around with this)
-    process_interval = 5
+    processed_frames = []
 
     while ret := video.grab():
-        # Increment the frame count
-        frame_count += 1
-
-        # Check if it's time to preprocess the frame
-        if frame_count % process_interval != 0:
-            continue
-
         # Retrieve the grabbed frame
         ret, frame = video.retrieve()
         if not ret:
             break
 
-        # Perform object detection and retrieve processed frame and bounding box coordinates
-        processed_frame, bounding_boxes = brand_predict(frame)
-        processed_frames.append((processed_frame, bounding_boxes))
+        # Perform object detection and retrieve processed frame with bounding boxes and class names
+        processed_frame, class_names = brand_predict(frame)
+        
+        processed_frames.append(processed_frame)
 
     # Release the video capture object
     video.release()
     print('Video processing completed')
 
     return processed_frames
+
+
+def construct_brand_video(img_array):
+    height, width, _ = img_array[0].shape
+    size = (width, height)
+
+    output_path = 'output/preprocess_video.mp4'
+    out = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*'mp4v'), 60, size)
+
+    for i in range(len(img_array)):
+        out.write(img_array[i])
+
+    out.release()
+
+# end of brand related code
 
 def license_predict(image):
 
@@ -258,46 +259,6 @@ def get_vehicle_data(license_plate, app_token):
         return vehicle_dto 
     except requests.exceptions.RequestException as e: 
         print(f"An error occurred: {e}")
-
-
-
-@app.route('/yolov8', methods=['POST', 'GET'])
-def predict_img():
-    if request.method == "POST":
-        if 'file' in request.files:
-        
-            #getting the file name and storing in "f" variable
-            f = request.files['file']
-            # storing the uploaded file by the user in upload folder
-            basepath = os.path.dirname(__file__)
-            filepath = os.path.join(basepath, 'uploads', f.filename)
-            print("upload folder is ", filepath)
-            f.save(filepath)
-            
-
-            file_extension = f.filename.rsplit('.', 1)[1].lower()
-              
-            
-            if file_extension == 'jpg':
-                img = cv2.imread(filepath)
-                frame = cv2.imencode('.jpg', cv2.UMat(img))[1].tobytes()
-                
-                image = Image.open(io.BytesIO(frame))
-
-                # model
-                detections = yolo.predict(image)      
-                # here maybe add function to read the license plate using OCR 
-                print('YOLO v8 detections', detections)
-
-                # return process_results(detections)
-                
-                # return display(f.filename)
-                
-                
-            elif file_extension == 'mp4':
-                print("Videos are not supported yet, come back later")
-    
-    return render_template('index.html')
 
 
 # initialzing easyocr
