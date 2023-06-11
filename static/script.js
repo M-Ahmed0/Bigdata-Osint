@@ -15,7 +15,7 @@ document.addEventListener("DOMContentLoaded", function() {
       formData.append("file", file);
   
       const xhr = new XMLHttpRequest();
-      xhr.open("POST", "/");
+      xhr.open("POST", "/predict");
   
       // Update the progress bar during the upload
       xhr.upload.addEventListener("progress", function(event) {

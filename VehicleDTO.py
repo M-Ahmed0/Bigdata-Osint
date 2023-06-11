@@ -20,3 +20,12 @@ class VehicleDTO:
         apk_expiry_date = data[0]['vervaldatum_apk_dt']
         veh_registration_nr = data[0]['typegoedkeuringsnummer']   
         return VehicleDTO(license_plate, brand, apk_expiry_date, veh_registration_nr)
+    
+    @staticmethod
+    def brand_dto(data):
+        # Access specific values using the keys
+        license_plate = ''
+        brand = data
+        apk_expiry_date = ''
+        veh_registration_nr = ''  
+        return VehicleDTO(license_plate, brand, apk_expiry_date, veh_registration_nr)

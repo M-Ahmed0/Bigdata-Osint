@@ -44,50 +44,7 @@ yolov5_model = torch.hub.load('ultralytics/yolov5', 'custom', path='200_epoch_ad
 yolov5_model = yolov5_model.to(device)
 app_token = 'vFOK1jHTLo7llP150mPktYWgJ'
 
-@app.route('/', methods=['POST', 'GET'])
-def predict_with_yolov5():
-    if request.method == "POST":
-        if 'file' in request.files:
-                #getting the file name and storing in "f" variable
-                f = request.files['file']
-                # storing the uploaded file by the user in upload folder
-                basepath = os.path.dirname(__file__)
-                filepath = os.path.join(basepath, 'uploads', f.filename)
-                file_extension = f.filename.rsplit('.', 1)[1].lower()
-                print("upload folder is ", filepath)
-
-                # save the image as a memory stream
-                stream = BytesIO()
-                stream.write(f.read())
-
-                # Reset the stream position to the beginning
-                stream.seek(0)
-
-                image = cv2.imdecode(np.frombuffer(stream.read(), np.uint8), cv2.IMREAD_COLOR)
-                print("image ----------", image)
-
-                validated_extension = validate_file_extension(file_extension)
-
-                if validated_extension == 'image':
-                    image_drawn, bounding_boxes = brand_predict(image)
-                    image_drawn = license_predict(image_drawn)
-                elif validated_extension == 'video':
-                    test = process_brand_video("test.mp4")
-                    print(test)
-                else:
-                    print("Sorry, this extension is not supported.")
-
-                # remove the image file from the server
-                f.close()
-                stream.close()
-
-                
-        
-    return render_template('index.html')
-
-
-
-
+yolov5_model.conf = 0.8
 # predict end point
 
 @app.route('/predict', methods=['POST'])
@@ -111,14 +68,13 @@ def predict():
     # Reset the stream position to the beginning
     stream.seek(0)
 
-    image = cv2.imdecode(np.frombuffer(stream.read(), np.uint8), cv2.IMREAD_COLOR)
-    print("image ----------", image)
-
     validated_extension = validate_file_extension(file_extension)
     vehicle_data1=''
     if validated_extension == 'image':
+        image = cv2.imdecode(np.frombuffer(stream.read(), np.uint8), cv2.IMREAD_COLOR)
+        print("image ----------", image)
         if model=='BRAND':           
-            image_drawn, vehicle_data1 = brand_predict(image)
+            image_drawn, vehicle_data = brand_predict(image)
         elif model == 'LP':
             image_drawn, vehicle_data = license_predict(image)
         elif model == 'BOTH':
@@ -126,10 +82,34 @@ def predict():
             image_drawn, vehicle_data = license_predict(image_drawn)
         else:
             return jsonify({'error': 'Sorry, the selected model does not exist.'}), 406
+        
+        # Saving the inference image temporarily
+        output_image_path = 'output/image.jpg'
+        cv2.imwrite(output_image_path, image_drawn)
+        with open("output/image.jpg", "rb") as image_file:
+            encoded_string = base64.b64encode(image_file.read())
+        return {'image': encoded_string.decode("utf-8"), 'data': jsonstring(vehicle_data.__dict__ if not vehicle_data1 else vehicle_data1)}, 200
+        # try: 
+        #     return {'image': encoded_string.decode("utf-8"), 'data': jsonstring(vehicle_data.__dict__ if not vehicle_data1 else vehicle_data1)}, 200
+        # except: 
+        #     return {'image': encoded_string.decode("utf-8"), 'data': jsonstring(vehicle_data if not vehicle_data1 else vehicle_data1)}, 200
     elif validated_extension == 'video':
-        img_arr = process_video_frames_brand("test.mp4")
+        if model=='BRAND':           
+            img_arr = process_video_frames_brand("test-video.mp4")
+        elif model == 'LP':
+            img_arr = process_video_LP("output/preprocess_video.mp4")
+        elif model == 'BOTH':
+            img_arr = process_video_frames_brand("test-video.mp4")
+            img_arr_lp = process_video_LP("output/preprocess_video.mp4")
+        else:
+            return jsonify({'error': 'Sorry, the selected model does not exist.'}), 406
+        
         construct_brand_video(img_arr)
-
+        if model == 'BOTH':
+            construct_brand_video(img_arr_lp)
+        with open("output/preprocess_video.mp4", "rb") as video_file:
+            encoded_string = base64.b64encode(video_file.read())
+        return {'video': encoded_string.decode("utf-8")}, 200
     else:
         return jsonify({'error': 'Sorry, this extension is not supported.'}), 406
 
@@ -137,20 +117,18 @@ def predict():
     f.close()
     stream.close()
    
-    # Saving the inference image temporarily
-    output_image_path = 'output/image.jpg'
-    cv2.imwrite(output_image_path, image_drawn)
+    
 
     # Return the inference image as the response
     #return jsonify(vehicle_data.__dict__ if not vehicle_data1 else vehicle_data1), 200
     #return jsonify({'image': image_drawn.tolist()}), 200
-    with open("output/image.jpg", "rb") as image_file:
-        encoded_string = base64.b64encode(image_file.read())
-    try: 
-        return {'image': encoded_string.decode("utf-8"), 'data': jsonstring(vehicle_data.__dict__ if not vehicle_data1 else vehicle_data1)}, 200
-    except: 
-        return {'image': encoded_string.decode("utf-8"), 'data': jsonstring(vehicle_data if not vehicle_data1 else vehicle_data1)}, 200
-    #return send_file(output_image_path, mimetype='image/jpeg')
+    # with open("output/image.jpg", "rb") as image_file:
+    #     encoded_string = base64.b64encode(image_file.read())
+    # try: 
+    #     return {'image': encoded_string.decode("utf-8"), 'data': jsonstring(vehicle_data.__dict__ if not vehicle_data1 else vehicle_data1)}, 200
+    # except: 
+    #     return {'image': encoded_string.decode("utf-8"), 'data': jsonstring(vehicle_data if not vehicle_data1 else vehicle_data1)}, 200
+    # #return send_file(output_image_path, mimetype='image/jpeg')
 
 
 if __name__ == "__main__":
@@ -165,6 +143,11 @@ def validate_file_extension(file_extension):
     elif file_extension in video_extensions:
         return "video"
 
+def process_video_LP(video):
+    detections = yolo.predict(video)
+    processed_frames = process_LP_video(detections)
+    return processed_frames
+    
 # start of brand related code
 def brand_predict(image):
     results = yolov5_model(image)
@@ -187,8 +170,10 @@ def brand_predict(image):
 
         cv2.rectangle(image_drawn, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2) # draw green rectangle
         cv2.putText(image_drawn, class_name, (xmin-10, ymin-10),cv2.FONT_HERSHEY_SIMPLEX, 1.5,(0, 255, 0), 2) # add green text
+    
+    vehicle_dto = VehicleDTO.brand_dto(class_name)
 
-    return image_drawn, class_name
+    return image_drawn, vehicle_dto
 
 
 
@@ -220,12 +205,11 @@ def construct_brand_video(img_array):
     size = (width, height)
 
     output_path = 'output/preprocess_video.mp4'
-    out = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*'mp4v'), 60, size)
+    out = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*'mp4v'), 30, size)
 
     for i in range(len(img_array)):
         out.write(img_array[i])
 
-    out.release()
 
 # end of brand related code
 
@@ -249,14 +233,8 @@ def get_vehicle_data(license_plate, app_token):
         if len(data) ==0:
             return data
         vehicle_dto = VehicleDTO.from_json(data)
-        # print("license_plate",license_plate)
-        # print("json",data)
-        # print(f"vehicle_dto: {vehicle_dto}")
-        # print(f"vehicle_dto: {vehicle_dto.license_plate}")
-        # print(f"vehicle_dto",vehicle_dto.brand)
-        # print(f"vehicle_dto",vehicle_dto.apk_expiry_date)
-        # print(f"vehicle_dto",vehicle_dto.veh_registration_nr)
         return vehicle_dto 
+    
     except requests.exceptions.RequestException as e: 
         print(f"An error occurred: {e}")
 
@@ -286,7 +264,7 @@ def process_results(results, image):
                 
             text = read_text_ocr(thresh)
 
-            vehicle_data = get_vehicle_data(text.replace("-", ""), app_token)
+            vehicle_data = get_vehicle_data(text, app_token)
             if vehicle_data=="":
                 # Create a kernel for dilation and erosion
                 kernel = np.ones((5, 5), np.uint8)  # Adjust the kernel size as needed
@@ -296,15 +274,52 @@ def process_results(results, image):
                 eroded_image = cv2.erode(dilated_image, kernel, iterations=1)
                 #ocr
                 text = read_text_ocr(eroded_image)
+                vehicle_data = get_vehicle_data(text, app_token)
 
-            print(text.replace("-", ""))
+            print(text)
                    
             cv2.rectangle(image, (x, y), (w, h), (0, 255, 0), 2) # draw green rectangle
             
-            cv2.putText(image, text.replace("-", ""), (x-10, y-10),cv2.FONT_HERSHEY_SIMPLEX, 1.5,(0, 255, 0), 2) # add green text
+            cv2.putText(image, text, (x-10, y-10),cv2.FONT_HERSHEY_SIMPLEX, 1.5,(0, 255, 0), 2) # add green text
 
             return (text,image,vehicle_data)
 
+# ---- process all the results by enhancing the pixels and performing OCR to read the license plates.
+def process_LP_video(results):
+    processed_frames = []
+    for r in results:
+        boxes = r.boxes
+        for box in boxes:
+                
+            b = box.xyxy[0]  # get box coordinates in (top, left, bottom, right) format
+            c = box.cls
+            
+            x,y,w,h = int(b[0]), int(b[1]), int(b[2]), int(b[3])
+            img = r.orig_img[y:h , x:w]
+                            
+            gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+                
+            
+            # Apply threshold
+            thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
+                           
+                
+            text = read_text_ocr(thresh)
+            print(text)
+                   
+            cv2.rectangle(r.orig_img, (x, y), (w, h), (0, 255, 0), 2) # draw green rectangle
+            
+            cv2.putText(r.orig_img, text, (x-10, y-10),cv2.FONT_HERSHEY_SIMPLEX, 1.5,(0, 255, 0), 2) # add green text
+            processed_frames.append(r.orig_img)
+
+            #return (text,r.orig_img)
+    
+    return processed_frames
+
+
+def clean_license_plate(license_plate): 
+    cleaned_plate = re.sub(r"[^a-zA-Z0-9]", "", license_plate)
+    return cleaned_plate.upper()
 
 def read_text_ocr(img):
     #ocr
@@ -317,5 +332,6 @@ def read_text_ocr(img):
         
         if len(result) > 1 and len(res[1]) > 6 and res[2] > 0.2:
             text = res[1]
+    text = clean_license_plate(text)
     return text
 #---------------------------------------------------------------------------------------------------------------------------------------#
