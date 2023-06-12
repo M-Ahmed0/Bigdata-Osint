@@ -73,10 +73,10 @@ def predict():
         if model=='BRAND':
             image_drawn, vehicle_data = brand.brand_predict(image, yolov5_model)           
         elif model == 'LP':
-            image_drawn, vehicle_data = license_plate.license_predict(image,yolov8_model,reader)
+            image_drawn, vehicle_data = license_plate.license_predict(image, yolov8_model, reader)
         elif model == 'BOTH':
             image_drawn, vehicle_data = brand.brand_predict(image, yolov5_model)
-            image_drawn, vehicle_data = license_plate.license_predict(image_drawn,yolov8_model,reader)
+            image_drawn, vehicle_data = license_plate.license_predict(image_drawn, yolov8_model, reader)
         else:
             return jsonify({'error': 'Sorry, the selected model does not exist.'}), 406
         
@@ -92,18 +92,18 @@ def predict():
     
     elif validated_extension == 'video':
         if model=='BRAND':           
-            img_arr = brand.process_brand_video(filepath,yolov8_model)
+            img_arr = brand.process_brand_video(filepath, yolov5_model)
         elif model == 'LP':
-            img_arr = license_plate.process_lp_video(filepath,yolov8_model,reader)
+            img_arr = license_plate.process_lp_video(filepath, yolov8_model,reader)
         elif model == 'BOTH':
-            img_arr = brand.process_brand_video(filepath,yolov8_model)
+            img_arr = brand.process_brand_video(filepath, yolov5_model)
             
         else:
             return jsonify({'error': 'Sorry, the selected model does not exist.'}), 406
         
         construct_video_from_frames(img_arr)
         if model == 'BOTH':
-            img_arr_lp = license_plate.process_lp_video("output/preprocess_video.mp4",yolov8_model)
+            img_arr_lp = license_plate.process_lp_video("output/preprocess_video.mp4", yolov8_model)
             construct_video_from_frames(img_arr_lp)
         with open("output/preprocess_video.mp4", "rb") as video_file:
             encoded_string = base64.b64encode(video_file.read())
