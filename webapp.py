@@ -35,18 +35,17 @@ CORS(app)
 def hello_world():
     return render_template('index.html')
 
- # loading yolov8 model
-yolo = YOLO('LP_model_best.pt')
+# Load in the yolov8 (license playes) and yolov5 (car brands) models
+yolov8_model = YOLO('./ml_models/lp_model.pt')
+yolov5_model = torch.hub.load('ultralytics/yolov5', 'custom', path='./ml_models/brand_model.pt', source='local')
 
-#loading yolov5 model (device prob not needed, but ill leave it here for now)
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-yolov5_model = torch.hub.load('ultralytics/yolov5', 'custom', path='200_epoch_adam_brand_detection.pt', force_reload=True)
-yolov5_model = yolov5_model.to(device)
+# Apply confidence factor for YOLOv5
+yolov5_model.conf = 0.6
+
+# Define app token for RDW API
 app_token = 'vFOK1jHTLo7llP150mPktYWgJ'
 
-yolov5_model.conf = 0.8
 # predict end point
-
 @app.route('/predict', methods=['POST'])
 def predict():
 
@@ -94,19 +93,20 @@ def predict():
         # except: 
         #     return {'image': encoded_string.decode("utf-8"), 'data': jsonstring(vehicle_data if not vehicle_data1 else vehicle_data1)}, 200
     elif validated_extension == 'video':
+
         if model=='BRAND':           
-            img_arr = process_video_frames_brand("test-video.mp4")
+            img_arr = process_brand_video("test-video.mp4")
         elif model == 'LP':
-            img_arr = process_video_LP("output/preprocess_video.mp4")
+            img_arr = process_lp_video("test-video.mp4")
         elif model == 'BOTH':
-            img_arr = process_video_frames_brand("test-video.mp4")
-            img_arr_lp = process_video_LP("output/preprocess_video.mp4")
+            img_arr = process_brand_video("test-video.mp4")
+            img_arr_lp = process_lp_video("output/preprocess_video.mp4")
         else:
             return jsonify({'error': 'Sorry, the selected model does not exist.'}), 406
         
-        construct_brand_video(img_arr)
+        construct_video_from_frames(img_arr)
         if model == 'BOTH':
-            construct_brand_video(img_arr_lp)
+            construct_video_from_frames(img_arr_lp)
         with open("output/preprocess_video.mp4", "rb") as video_file:
             encoded_string = base64.b64encode(video_file.read())
         return {'video': encoded_string.decode("utf-8")}, 200
@@ -116,8 +116,6 @@ def predict():
     # remove the image file from the server
     f.close()
     stream.close()
-   
-    
 
     # Return the inference image as the response
     #return jsonify(vehicle_data.__dict__ if not vehicle_data1 else vehicle_data1), 200
@@ -143,9 +141,9 @@ def validate_file_extension(file_extension):
     elif file_extension in video_extensions:
         return "video"
 
-def process_video_LP(video):
-    detections = yolo.predict(video)
-    processed_frames = process_LP_video(detections)
+def process_lp_video(video):
+    detections = yolov8_model.predict(video)
+    processed_frames = process_lp_video_frames(detections)
     return processed_frames
     
 # start of brand related code
@@ -177,7 +175,7 @@ def brand_predict(image):
 
 
 
-def process_video_frames_brand(video_path):
+def process_brand_video(video_path):
     video = cv2.VideoCapture(video_path)
 
     processed_frames = []
@@ -200,12 +198,12 @@ def process_video_frames_brand(video_path):
     return processed_frames
 
 
-def construct_brand_video(img_array):
+def construct_video_from_frames(img_array):
     height, width, _ = img_array[0].shape
     size = (width, height)
 
     output_path = 'output/preprocess_video.mp4'
-    out = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*'mp4v'), 30, size)
+    out = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*'mp4v'), 60, size)
 
     for i in range(len(img_array)):
         out.write(img_array[i])
@@ -215,7 +213,7 @@ def construct_brand_video(img_array):
 
 def license_predict(image):
 
-    detections = yolo.predict(image)  
+    detections = yolov8_model.predict(image)  
     license_plate,image_drawn,vehicle_data = process_results(detections,image)
 
     # Save the drawn image as PNG ----- testing purposes
@@ -285,7 +283,7 @@ def process_results(results, image):
             return (text,image,vehicle_data)
 
 # ---- process all the results by enhancing the pixels and performing OCR to read the license plates.
-def process_LP_video(results):
+def process_lp_video_frames(results):
     processed_frames = []
     for r in results:
         boxes = r.boxes
