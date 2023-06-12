@@ -197,7 +197,8 @@ class LicensePlateService:
 
                 # put the text above the box in the image
                 cv2.putText(r.orig_img, text, (x-10, y-10),cv2.FONT_HERSHEY_SIMPLEX, 1.5,(0, 255, 0), 2) # add green text
-                processed_frames.append(r.orig_img)
+            
+            processed_frames.append(r.orig_img)
 
     
         return processed_frames

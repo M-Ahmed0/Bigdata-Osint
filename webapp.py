@@ -175,7 +175,7 @@ def construct_video_from_frames(img_array):
     size = (width, height)
 
     output_path = 'output/preprocess_video.mp4'
-    out = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*'mp4v'), 60, size)
+    out = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*'mp4v'), 30, size)
 
     for i in range(len(img_array)):
         out.write(img_array[i])
