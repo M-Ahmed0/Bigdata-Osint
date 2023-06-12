@@ -65,3 +65,14 @@ To properly set up and run this project, follow the instructions below:
    ```
 
 The application should now be up and running. You can access it by visiting the provided URL in your web browser.
+
+## Compatibility issues 
+
+1. In case opencv-python is already installed and encountered a compatibility issue the pleas run the following commands:
+
+   ```bash
+   pip uninstall opencv-python
+   pip uninstall opencv-contrib-python
+   pip uninstall opencv-contrib-python-headless
+   pip3 install opencv-contrib-python==4.5.5.62
+   ```

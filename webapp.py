@@ -24,9 +24,9 @@ from io import BytesIO
 from collections import Counter
 from json import dumps as jsonstring
 from ultralytics import YOLO
-from VehicleDTO import VehicleDTO
-from classes.brand_service import Brand_service
-from classes.license_plate_service import license_plate_service
+from dtos.VehicleDTO import VehicleDTO
+from services.brand_service import BrandService
+from services.license_plate_service import LicensePlateService
 
 from flask_cors import CORS 
 import base64
@@ -65,56 +65,96 @@ def predict():
     validated_extension = validate_file_extension(file_extension)
     
 
-    brand = Brand_service()
-    license_plate=license_plate_service()
-
-    if validated_extension == 'image':
-        image = cv2.imread(filepath)
-        if model=='BRAND':
-            image_drawn, vehicle_data = brand.brand_predict(image, yolov5_model)           
-        elif model == 'LP':
-            image_drawn, vehicle_data = license_plate.license_predict(image, yolov8_model, reader)
-        elif model == 'BOTH':
-            image_drawn, vehicle_data = brand.brand_predict(image, yolov5_model)
-            image_drawn, vehicle_data = license_plate.license_predict(image_drawn, yolov8_model, reader)
-        else:
-            return jsonify({'error': 'Sorry, the selected model does not exist.'}), 406
-        
-        # Saving the inference image temporarily
-        output_image_path = 'output/image.jpg'
-        cv2.imwrite(output_image_path, image_drawn)
-        with open("output/image.jpg", "rb") as image_file:
-            encoded_string = base64.b64encode(image_file.read())
-        # remove the image file from the server
-        f.close()
-        os.remove(filepath)
-        return {'image': encoded_string.decode("utf-8"), 'data': jsonstring(vehicle_data.__dict__), 'type': 'image'}, 200
+    brand = BrandService()
+    license_plate=LicensePlateService()
     
-    elif validated_extension == 'video':
-        if model=='BRAND':           
-            img_arr = brand.process_brand_video(filepath, yolov5_model)
-        elif model == 'LP':
-            img_arr = license_plate.process_lp_video(filepath, yolov8_model,reader)
-        elif model == 'BOTH':
-            img_arr = brand.process_brand_video(filepath, yolov5_model)
-            
-        else:
-            return jsonify({'error': 'Sorry, the selected model does not exist.'}), 406
-        
-        construct_video_from_frames(img_arr)
-        if model == 'BOTH':
-            img_arr_lp = license_plate.process_lp_video("output/preprocess_video.mp4", yolov8_model)
-            construct_video_from_frames(img_arr_lp)
-        with open("output/preprocess_video.mp4", "rb") as video_file:
-            encoded_string = base64.b64encode(video_file.read())
+    if validated_extension == 'image':
+        encoded_string,vehicle_data,data_brand =predict_image(filepath,model,brand,license_plate)
         # remove the image file from the server
-        test = encoded_string.decode("utf-8")
         os.remove(filepath)
-        return {'video': test, 'type': 'video', 'data': ''}, 200
+        if not encoded_string and not vehicle_data and not data_brand:
+            return jsonify({'error': 'Sorry, the selected model does not exist.'}), 406
+        else:
+            try:
+                return {'image': encoded_string.decode("utf-8"), 'data_api': jsonstring('' if not vehicle_data else vehicle_data.__dict__ ), 'type': 'image', 'data_brand': jsonstring(data_brand)}, 200
+            except:
+                return {'error': 'could not decode the image to the response'}, 406
+            
+
+    elif validated_extension == 'video':
+        decoded_string =predict_video(filepath,model,brand,license_plate)
+        # remove the file from the server
+        os.remove(filepath)
+        if not decoded_string:
+            return jsonify({'error': 'Sorry, the selected model does not exist.'}), 406
+        else:
+            try:
+                return {'video': decoded_string, 'type': 'video', 'data': ''}, 200
+            except:
+                return {'error': 'could not decode the video to the response'}, 406
+
     else:
         return jsonify({'error': 'Sorry, this extension is not supported.'}), 406
 
 
+def predict_image(filepath,model,brand,license_plate):
+    data_brand = ''
+    vehicle_data = []
+    # read the image
+    image = cv2.imread(filepath)
+
+    # check which model is selected
+    if model=='BRAND':
+        # process brand model 
+        image_drawn, data_brand = brand.brand_predict(image, yolov5_model)           
+    elif model == 'LP':
+        # process license plate model
+        image_drawn, vehicle_data = license_plate.license_predict(image, yolov8_model, reader)
+    elif model == 'BOTH':
+        # process both model
+        image_drawn, data_brand = brand.brand_predict(image, yolov5_model)
+        image_drawn, vehicle_data = license_plate.license_predict(image_drawn, yolov8_model, reader)
+    else:
+        return None,None,None
+        
+    # Saving the inference image temporarily
+    output_image_path = 'output/image.jpg'
+    cv2.imwrite(output_image_path, image_drawn)
+    with open("output/image.jpg", "rb") as image_file:
+        encoded_string = base64.b64encode(image_file.read())
+    
+    return (encoded_string,vehicle_data,data_brand)
+    
+
+
+def predict_video(filepath,model,brand,license_plate):
+    # check which model is selected
+    if model=='BRAND':
+        # process brand model           
+        img_arr = brand.process_brand_video(filepath, yolov5_model)
+    elif model == 'LP':
+        # process license plate model
+        img_arr = license_plate.process_lp_video(filepath, yolov8_model,reader)
+    elif model == 'BOTH':
+        # process brand model
+        img_arr = brand.process_brand_video(filepath, yolov5_model)
+            
+    else:
+        return None
+
+    # create the video from the frames    
+    construct_video_from_frames(img_arr)
+    if model == 'BOTH':
+        # process license plate model
+        img_arr_lp = license_plate.process_lp_video("output/preprocess_video.mp4", yolov8_model,reader)
+        # create the video from the frames  
+        construct_video_from_frames(img_arr_lp)
+    with open("output/preprocess_video.mp4", "rb") as video_file:
+        encoded_string = base64.b64encode(video_file.read())
+    # decode video
+    decoded_string = encoded_string.decode("utf-8")
+    return decoded_string
+    
 
 
 if __name__ == "__main__":

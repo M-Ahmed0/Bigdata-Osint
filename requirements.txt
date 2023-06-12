@@ -8,6 +8,7 @@ matplotlib==3.7.1
 numpy
 opencv-python
 opencv-python-headless
+opencv-contrib-python==4.5.5.62
 packaging==23.1
 pandas==2.0.1
 Pillow==9.5.0
