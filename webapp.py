@@ -25,6 +25,7 @@ from collections import Counter
 from json import dumps as jsonstring
 from ultralytics import YOLO
 from VehicleDTO import VehicleDTO
+from classes.brand import Brand
 
 from flask_cors import CORS 
 import base64
@@ -69,15 +70,19 @@ def predict():
 
     validated_extension = validate_file_extension(file_extension)
     vehicle_data1=''
+
+    brand = Brand()
+
     if validated_extension == 'image':
         image = cv2.imdecode(np.frombuffer(stream.read(), np.uint8), cv2.IMREAD_COLOR)
         print("image ----------", image)
-        if model=='BRAND':           
-            image_drawn, vehicle_data = brand_predict(image)
+
+        if model=='BRAND':
+            image_drawn, vehicle_data = brand.brand_predict(image, yolov5_model)           
         elif model == 'LP':
             image_drawn, vehicle_data = license_predict(image)
         elif model == 'BOTH':
-            image_drawn, vehicle_data = brand_predict(image)
+            image_drawn, vehicle_data = brand.brand_predict(image, yolov5_model)
             image_drawn, vehicle_data = license_predict(image_drawn)
         else:
             return jsonify({'error': 'Sorry, the selected model does not exist.'}), 406
@@ -95,11 +100,11 @@ def predict():
     elif validated_extension == 'video':
 
         if model=='BRAND':           
-            img_arr = process_brand_video("test-video.mp4")
+            img_arr = brand.process_brand_video("test-video.mp4")
         elif model == 'LP':
             img_arr = process_lp_video("test-video.mp4")
         elif model == 'BOTH':
-            img_arr = process_brand_video("test-video.mp4")
+            img_arr = brand.process_brand_video("test-video.mp4")
             img_arr_lp = process_lp_video("output/preprocess_video.mp4")
         else:
             return jsonify({'error': 'Sorry, the selected model does not exist.'}), 406
@@ -146,57 +151,6 @@ def process_lp_video(video):
     processed_frames = process_lp_video_frames(detections)
     return processed_frames
     
-# start of brand related code
-def brand_predict(image):
-    results = yolov5_model(image)
-    pred_boxes = results.xyxy[0].detach().numpy()
-
-    class_name = ""
-    
-    #for class recognition
-    class_names = results.names
-
-    image_drawn = image.copy()
-    for box in pred_boxes:
-        xmin, ymin, xmax, ymax, conf, cls = box
-        print("xmin", xmin, "ymin",ymin, "xmax", xmax, "ymax", ymax) 
-        xmin, ymin, xmax, ymax = int(xmin), int(ymin), int(xmax), int(ymax)
-
-        # class recognition
-        class_name = class_names[int(cls)]
-        print("Brand detected:", class_name)
-
-        cv2.rectangle(image_drawn, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2) # draw green rectangle
-        cv2.putText(image_drawn, class_name, (xmin-10, ymin-10),cv2.FONT_HERSHEY_SIMPLEX, 1.5,(0, 255, 0), 2) # add green text
-    
-    vehicle_dto = VehicleDTO.brand_dto(class_name)
-
-    return image_drawn, vehicle_dto
-
-
-
-def process_brand_video(video_path):
-    video = cv2.VideoCapture(video_path)
-
-    processed_frames = []
-
-    while ret := video.grab():
-        # Retrieve the grabbed frame
-        ret, frame = video.retrieve()
-        if not ret:
-            break
-
-        # Perform object detection and retrieve processed frame with bounding boxes and class names
-        processed_frame, class_names = brand_predict(frame)
-        
-        processed_frames.append(processed_frame)
-
-    # Release the video capture object
-    video.release()
-    print('Video processing completed')
-
-    return processed_frames
-
 
 def construct_video_from_frames(img_array):
     height, width, _ = img_array[0].shape
@@ -208,8 +162,6 @@ def construct_video_from_frames(img_array):
     for i in range(len(img_array)):
         out.write(img_array[i])
 
-
-# end of brand related code
 
 def license_predict(image):
 
