@@ -51,7 +51,7 @@ class PredictController:
                 return jsonify({'error': 'Sorry, the selected model does not exist.'}), 406
             else:
                 try:
-                    return {'image': encoded_string.decode("utf-8"), 'data_api': jsonstring('' if not vehicle_data else vehicle_data.__dict__ ), 'type': 'image', 'data_brand': jsonstring(data_brands)}, 200
+                    return {'image': encoded_string.decode("utf-8"), 'data_api': jsonstring('' if not vehicle_data else vehicle_data.__dict__ ), 'type': 'image', 'data_brands': jsonstring(data_brands)}, 200
                 except:
                     return {'error': 'could not decode the image to the response'}, 406
             
