@@ -5,9 +5,16 @@ from services.brand_service import BrandService
 from services.license_plate_service import LicensePlateService
 import os
 import base64
+from azure.storage.blob import BlobServiceClient, ContentSettings ,generate_container_sas, ContainerSasPermissions, BlobSasPermissions, AccountSasPermissions
+from datetime import datetime, timedelta
+import pytz
 
 class PredictController:
-    
+    # Azure Blob Storage connection string
+    connection_string = "AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
+
+    # Container name in Azure Blob Storage
+    container_name = "prediction"
     # constructor for creation of controller instance and assignment of variables
     def __init__(self,  yolov8_model, yolov5_model, reader, root_path):
         
@@ -18,7 +25,7 @@ class PredictController:
      
     # prediction end-point for running inference on images and videos
     def predict(self, request):
-     
+
         if 'file' not in request.files:
             return jsonify({'error': 'No file uploaded.'}), 400
         model = request.args.get("model")    
@@ -63,7 +70,7 @@ class PredictController:
                 return jsonify({'error': 'Sorry, the selected model does not exist.'}), 406
             else:
                 try:
-                    return {'video': decoded_string, 'type': 'video', 'data': ''}, 200
+                    return {'video': jsonstring(decoded_string), 'type': 'video', 'data': ''}, 200
                 except:
                     return {'error': 'could not decode the video to the response'}, 406
 
@@ -120,11 +127,17 @@ class PredictController:
             img_arr_lp = license_plate.process_lp_video("output/preprocess_video.mp4", self.yolov8_model,self.reader)
             # create the video from the frames  
             self.construct_video_from_frames(img_arr_lp)
-        with open("output/preprocess_video.mp4", "rb") as video_file:
-            encoded_string = base64.b64encode(video_file.read())
-        # decode video
-        decoded_string = encoded_string.decode("utf-8")
-        return decoded_string
+        video_url = self.upload_video_to_azure("output/preprocess_video.mp4", "preprocess_video.mp4")
+        # with open("output/preprocess_video.mp4", "rb") as video_file:
+        #     encoded_string = base64.b64encode(video_file.read())
+        # # decode video
+        # decoded_string = encoded_string.decode("utf-8")
+        print(video_url)
+        print(video_url)
+        print(video_url)
+        print(video_url)
+        print(video_url)
+        return video_url
         
     # method to check for whether a valid extension has been provided
     def validate_file_extension(self, file_extension):
@@ -148,3 +161,37 @@ class PredictController:
 
         for i in range(len(img_array)):
             out.write(img_array[i])
+
+
+    def upload_video_to_azure(self,file_path, file_name):
+        blob_service_client = BlobServiceClient.from_connection_string(self.connection_string)
+        container_client = blob_service_client.get_container_client(self.container_name)
+        #permissions = ContainerSasPermissions(read=True)
+        permissions = AccountSasPermissions(read=True)
+        # Define the desired time zone
+        # timezone = pytz.timezone('Europe/Paris')
+
+        # # Get the current UTC time
+        # current_time = datetime.utcnow()
+
+        # # Convert the current UTC time to the desired time zone
+        # current_time_europe = current_time.astimezone(timezone)
+
+        # # Set the expiry time as 10 hours from the current time in Europe time
+        # expiry = current_time_europe + timedelta(hours=10)
+        expiry = datetime.utcnow() + timedelta(hours=10)
+        sas_token = generate_container_sas(
+            account_name=blob_service_client.account_name,
+            container_name=self.container_name,
+            account_key=blob_service_client.credential.account_key,
+            permission=permissions,
+            expiry=expiry
+            )
+        
+
+        with open(file_path, "rb") as data:
+            container_client.upload_blob(name=file_name, data=data,overwrite=True, content_settings=ContentSettings(content_type='video/mp4'))
+        # Return the video URL
+        # Include the SAS token in the video URL
+        video_url = f"https://{blob_service_client.account_name}.blob.core.windows.net/{self.container_name}/{file_name}?{sas_token}"
+        return video_url
