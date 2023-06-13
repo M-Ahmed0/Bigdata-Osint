@@ -1,24 +1,14 @@
-import argparse
-import io
-from PIL import Image
-import datetime
-from io import BytesIO
-from collections import Counter
 from json import dumps as jsonstring
 import cv2
-import numpy as np
-from flask import Flask, render_template, request, redirect, send_file, url_for, Response , jsonify
-from werkzeug.utils import secure_filename, send_from_directory
-from dtos.VehicleDTO import VehicleDTO
+from flask import jsonify
 from services.brand_service import BrandService
 from services.license_plate_service import LicensePlateService
 import os
 import base64
-import re
 
 class PredictController:
     
-    
+    # constructor for creation of controller instance and assignment of variables
     def __init__(self,  yolov8_model, yolov5_model, reader, root_path):
         
         self.yolov8_model = yolov8_model
@@ -26,7 +16,7 @@ class PredictController:
         self.reader = reader
         self.root_path = root_path
      
-
+    # prediction end-point for running inference on images and videos
     def predict(self, request):
      
         if 'file' not in request.files:
@@ -47,8 +37,9 @@ class PredictController:
     
         # initializing classes
         brand = BrandService()
-        license_plate=LicensePlateService()
-    
+        license_plate = LicensePlateService()
+
+        # section for handling image based recognition
         if validated_extension == 'image':
             encoded_string,vehicle_data,data_brand = self.predict_image(filepath,model,brand,license_plate)
             # remove the image file from the server
@@ -61,7 +52,7 @@ class PredictController:
                 except:
                     return {'error': 'could not decode the image to the response'}, 406
             
-
+        # section for handling video based recognition
         elif validated_extension == 'video':
             decoded_string = self.predict_video(filepath,model,brand,license_plate)
             # remove the file from the server
@@ -78,7 +69,7 @@ class PredictController:
             return jsonify({'error': 'Sorry, this extension is not supported.'}), 406
 
 
-
+    # method for handling logic of image prediction
     def predict_image(self, filepath,model,brand,license_plate):
         data_brand = ''
         vehicle_data = []
@@ -108,7 +99,7 @@ class PredictController:
         return (encoded_string,vehicle_data,data_brand) 
 
 
-
+    # method for handling logic of video prediction
     def predict_video(self,filepath,model,brand,license_plate):
         # check which model is selected
         if model=='BRAND':
@@ -130,14 +121,14 @@ class PredictController:
             # process license plate model
             img_arr_lp = license_plate.process_lp_video("output/preprocess_video.mp4", self.yolov8_model,self.reader)
             # create the video from the frames  
-            construct_video_from_frames(img_arr_lp)
+            self.construct_video_from_frames(img_arr_lp)
         with open("output/preprocess_video.mp4", "rb") as video_file:
             encoded_string = base64.b64encode(video_file.read())
         # decode video
         decoded_string = encoded_string.decode("utf-8")
         return decoded_string
         
-
+    # method to check for whether a valid extension has been provided
     def validate_file_extension(self, file_extension):
         image_extensions = ['jpeg', 'jpg', 'png']
         video_extensions = ['mp4', 'mov', 'avi']
@@ -147,7 +138,7 @@ class PredictController:
         elif file_extension in video_extensions:
             return "video"
 
-
+    # method for building up a video from given frames
     def construct_video_from_frames(self, img_array):
         height, width, _ = img_array[0].shape
         size = (width, height)
@@ -157,8 +148,3 @@ class PredictController:
 
         for i in range(len(img_array)):
             out.write(img_array[i])
-
-
-
-
-

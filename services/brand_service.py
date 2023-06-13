@@ -1,5 +1,4 @@
 import cv2
-from dtos.VehicleDTO import VehicleDTO
 
 class BrandService:
     """
@@ -29,6 +28,7 @@ class BrandService:
         # For class recognition
         class_names = results.names
 
+        # Looping through every box detection, identifying coordicates, drawing a box and displaying class name (and returning back the image with class name)
         image_drawn = image.copy()
         for box in pred_boxes:
             xmin, ymin, xmax, ymax, conf, cls = box

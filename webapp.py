@@ -1,15 +1,11 @@
-from flask import Flask, render_template, request, redirect, send_file, url_for, Response , jsonify
+from flask import Flask, request
 import os
 import torch
-import cv2
-import numpy as np
-import tensorflow as tf
-import requests
 import easyocr
 from ultralytics import YOLO
 from controllers import predict_controller
 import configparser
-from flask_cors import CORS 
+from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app)
@@ -39,7 +35,7 @@ yolov5_model.conf = 0.6
 reader = easyocr.Reader(['en'] , gpu = True)
 
 # Create an instance of the PredictController
-predict_controller = predict_controller.PredictController( yolov8_model, yolov5_model, reader, root_path)
+predict_controller = predict_controller.PredictController(yolov8_model, yolov5_model, reader, root_path)
 
 # Register the endpoint by calling the controller method
 @app.route('/predict', methods=['POST'])

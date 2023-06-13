@@ -1,5 +1,3 @@
-import json
-
 class VehicleDTO:
     """
     Data Transfer Object (DTO) for representing vehicle information.
