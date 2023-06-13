@@ -24,16 +24,18 @@ class PredictController:
         model = request.args.get("model")    
         print(model)
         f = request.files['file']
-        # storing the uploaded file by the user in upload folder
-        basepath = os.path.dirname(__file__)
         
         filepath = os.path.join(self.root_path, 'uploads', f.filename)
         file_extension = f.filename.rsplit('.', 1)[1].lower()
+
+        # check before saving to avoid spamming the folder with invalid files
+        validated_extension = self.validate_file_extension(file_extension)
+        if validated_extension == 'invalid':
+            return jsonify({'error': 'Sorry, this extension is not supported.'}), 406
+        
         print("upload folder is ", filepath)
 
         f.save(filepath)
-
-        validated_extension = self.validate_file_extension(file_extension)
     
         # initializing classes
         brand = BrandService()
@@ -64,10 +66,6 @@ class PredictController:
                     return {'video': decoded_string, 'type': 'video', 'data': ''}, 200
                 except:
                     return {'error': 'could not decode the video to the response'}, 406
-
-        else:
-            return jsonify({'error': 'Sorry, this extension is not supported.'}), 406
-
 
     # method for handling logic of image prediction
     def predict_image(self, filepath,model,brand,license_plate):
@@ -137,6 +135,8 @@ class PredictController:
             return "image"
         elif file_extension in video_extensions:
             return "video"
+        else:
+            return "invalid"
 
     # method for building up a video from given frames
     def construct_video_from_frames(self, img_array):
