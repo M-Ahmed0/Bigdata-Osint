@@ -28,7 +28,7 @@ yolov8_model = YOLO(yolov8_file)
 yolov5_model = torch.hub.load('ultralytics/yolov5', 'custom', path=yolov5_file, source='local')
 
 # Apply confidence factor for YOLOv5
-yolov5_model.conf = 0.6
+yolov5_model.conf = 0.7
 
 
 # initialzing easyocr
