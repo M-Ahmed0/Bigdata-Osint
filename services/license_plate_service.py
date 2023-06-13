@@ -124,6 +124,7 @@ class LicensePlateService:
         """
         # process all the results by enhancing the pixels and performing OCR to read the license plates.
         for r in results:
+            vehicles_data=[]
             boxes = r.boxes
             for box in boxes:
                 
@@ -155,14 +156,16 @@ class LicensePlateService:
                     vehicle_data = self.get_vehicle_data(text)
 
                 print(text)
+                vehicles_data.append(vehicle_data.__dict__)
 
                 # draw a rectangle around the box   
                 cv2.rectangle(image, (x, y), (w, h), (0, 255, 0), 2) 
-            
+
                 # put the text above the box in the image
                 cv2.putText(image, text, (x-10, y-10),cv2.FONT_HERSHEY_SIMPLEX, 1.5,(0, 255, 0), 2) 
 
-                return (text,image,vehicle_data)
+            return (text,image,vehicles_data)
+            
     
     
     def process_lp_video_frames(self,results,reader):
