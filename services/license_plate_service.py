@@ -3,7 +3,7 @@ import cv2
 from dtos.VehicleDTO import VehicleDTO
 import requests
 import numpy as np
-
+import configparser
 
 
 class LicensePlateService:
@@ -35,11 +35,17 @@ class LicensePlateService:
         read_text_ocr(img, reader):
             Performs OCR on an image and returns the extracted text.
     """
-    # Define app token for RDW API
-    app_token = 'vFOK1jHTLo7llP150mPktYWgJ'
 
-     # Retrieve vehicle data from the RDW API based on the license plate
-    base_url = 'https://opendata.rdw.nl/resource/m9d7-ebf2.json' 
+
+    # Load the configuration file
+    config = configparser.ConfigParser()
+    config.read('config.ini')
+
+    # get this API token
+    app_token = config.get('API', 'app_token')
+
+    # get the BASE_URL 
+    base_url = config.get('BASE_URL', 'base_url')
     
     def license_predict(self,image,yolov8_model,reader):
         """
@@ -158,7 +164,7 @@ class LicensePlateService:
 
                 return (text,image,vehicle_data)
     
-    # ---- process all the results by enhancing the pixels and performing OCR to read the license plates.
+    
     def process_lp_video_frames(self,results,reader):
         """
         Processes license plate frames in a video by enhancing pixels and performing OCR.
