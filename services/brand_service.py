@@ -24,9 +24,9 @@ class BrandService:
         pred_boxes = results.xyxy[0].detach().numpy()
 
         class_name = ""
-        
+        class_names = []
         # For class recognition
-        class_names = results.names
+        class_labels = results.names
 
         # Looping through every box detection, identifying coordicates, drawing a box and displaying class name (and returning back the image with class name)
         image_drawn = image.copy()
@@ -36,14 +36,16 @@ class BrandService:
             xmin, ymin, xmax, ymax = int(xmin), int(ymin), int(xmax), int(ymax)
 
             # Class recognition
-            class_name = class_names[int(cls)]
+            class_name = class_labels[int(cls)]
             print("Brand detected:", class_name)
+
+            class_names.append(class_name)
 
             cv2.rectangle(image_drawn, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2) # Draw green rectangle
             cv2.putText(image_drawn, class_name, (xmin-10, ymin-10), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 2) # Add green text
         
 
-        return image_drawn, class_name
+        return image_drawn, class_names
 
 
     def process_brand_video(self, video_path, yolov5_model):

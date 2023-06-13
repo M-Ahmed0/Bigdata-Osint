@@ -44,14 +44,14 @@ class PredictController:
 
         # section for handling image based recognition
         if validated_extension == 'image':
-            encoded_string,vehicle_data,data_brand = self.predict_image(filepath,model,brand,license_plate)
+            encoded_string,vehicle_data,data_brands = self.predict_image(filepath,model,brand,license_plate)
             # remove the image file from the server
             os.remove(filepath)
-            if not encoded_string and not vehicle_data and not data_brand:
+            if not encoded_string and not vehicle_data and not data_brands:
                 return jsonify({'error': 'Sorry, the selected model does not exist.'}), 406
             else:
                 try:
-                    return {'image': encoded_string.decode("utf-8"), 'data_api': jsonstring('' if not vehicle_data else vehicle_data.__dict__ ), 'type': 'image', 'data_brand': jsonstring(data_brand)}, 200
+                    return {'image': encoded_string.decode("utf-8"), 'data_api': jsonstring('' if not vehicle_data else vehicle_data.__dict__ ), 'type': 'image', 'data_brand': jsonstring(data_brands)}, 200
                 except:
                     return {'error': 'could not decode the image to the response'}, 406
             
@@ -70,7 +70,7 @@ class PredictController:
 
     # method for handling logic of image prediction
     def predict_image(self, filepath,model,brand,license_plate):
-        data_brand = ''
+        data_brands = []
         vehicle_data = []
         # read the image
         image = cv2.imread(filepath)
@@ -78,13 +78,13 @@ class PredictController:
         # check which model is selected
         if model=='BRAND':
             # process brand model 
-            image_drawn, data_brand = brand.brand_predict(image, self.yolov5_model)           
+            image_drawn, data_brands = brand.brand_predict(image, self.yolov5_model)           
         elif model == 'LP':
             # process license plate model
             image_drawn, vehicle_data = license_plate.license_predict(image, self.yolov8_model, self.reader)
         elif model == 'BOTH':
             # process both model
-            image_drawn, data_brand = brand.brand_predict(image, self.yolov5_model) 
+            image_drawn, data_brands = brand.brand_predict(image, self.yolov5_model) 
             image_drawn, vehicle_data = license_plate.license_predict(image_drawn, self.yolov8_model, self.reader)
         else:
             return None,None,None
@@ -95,7 +95,7 @@ class PredictController:
         with open("output/image.jpg", "rb") as image_file:
             encoded_string = base64.b64encode(image_file.read())
         
-        return (encoded_string,vehicle_data,data_brand) 
+        return (encoded_string,vehicle_data,data_brands) 
 
 
     # method for handling logic of video prediction
