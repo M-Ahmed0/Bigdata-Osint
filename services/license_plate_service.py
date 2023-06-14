@@ -123,46 +123,52 @@ class LicensePlateService:
             tuple: A tuple containing the detected license plate, the annotated image, and vehicle data.
         """
         # process all the results by enhancing the pixels and performing OCR to read the license plates.
-        for r in results:
-            boxes = r.boxes
-            for box in boxes:
+        try:
+            for r in results:
+                boxes = r.boxes
+                for box in boxes:
+                    
+                    b = box.xyxy[0]  # get box coordinates in (top, left, bottom, right) format
+                    c = box.cls
                 
-                b = box.xyxy[0]  # get box coordinates in (top, left, bottom, right) format
-                c = box.cls
-            
-                x,y,w,h = int(b[0]), int(b[1]), int(b[2]), int(b[3])
-                img = r.orig_img[y:h , x:w]
+                    x,y,w,h = int(b[0]), int(b[1]), int(b[2]), int(b[3])
+                    img = r.orig_img[y:h , x:w]
+                                
+                    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+                    
+                
+                    # Apply threshold
+                    thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
                             
-                gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-                
-            
-                # Apply threshold
-                thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
-                           
-                # read text using ocr
-                text = self.read_text_ocr(thresh, reader)
+                    # read text using ocr
+                    text = self.read_text_ocr(thresh, reader)
 
-                vehicle_data = self.get_vehicle_data(text)
-                if vehicle_data=="":
-                    # Create a kernel for dilation and erosion
-                    kernel = np.ones((5, 5), np.uint8)  # Adjust the kernel size as needed
-                    # Apply dilation
-                    dilated_image = cv2.dilate(img, kernel, iterations=1)
-                    # Apply erosion
-                    eroded_image = cv2.erode(dilated_image, kernel, iterations=1)
-                    #ocr
-                    text = self.read_text_ocr(eroded_image, reader)
                     vehicle_data = self.get_vehicle_data(text)
+                    if vehicle_data=="":
+                        # Create a kernel for dilation and erosion
+                        kernel = np.ones((5, 5), np.uint8)  # Adjust the kernel size as needed
+                        # Apply dilation
+                        dilated_image = cv2.dilate(img, kernel, iterations=1)
+                        # Apply erosion
+                        eroded_image = cv2.erode(dilated_image, kernel, iterations=1)
+                        #ocr
+                        text = self.read_text_ocr(eroded_image, reader)
+                        vehicle_data = self.get_vehicle_data(text)
 
-                print(text)
+                    print(text)
 
-                # draw a rectangle around the box   
-                cv2.rectangle(image, (x, y), (w, h), (0, 255, 0), 2) 
-            
-                # put the text above the box in the image
-                cv2.putText(image, text, (x-10, y-10),cv2.FONT_HERSHEY_SIMPLEX, 1.5,(0, 255, 0), 2) 
+                    # draw a rectangle around the box   
+                    cv2.rectangle(image, (x, y), (w, h), (0, 255, 0), 2) 
+                
+                    # put the text above the box in the image
+                    cv2.putText(image, text, (x-10, y-10),cv2.FONT_HERSHEY_SIMPLEX, 1.5,(0, 255, 0), 2) 
 
-                return (text,image,vehicle_data)
+                    return (text,image,vehicle_data)
+        except:
+            pass
+
+        # Return default values when no results or error occurred
+        return ("", image, "")
     
     
     def process_lp_video_frames(self,results,reader):
