@@ -68,7 +68,7 @@ The application should now be up and running. You can access it by visiting the 
 
 ## Compatibility issues 
 
-1. In case opencv-python is already installed and encountered a compatibility issue the pleas run the following commands:
+1. In case opencv-python is already installed and encountered a compatibility issue then please run the following commands:
 
    ```bash
    pip uninstall opencv-python
