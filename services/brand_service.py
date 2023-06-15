@@ -18,7 +18,7 @@ class BrandService:
             yolov5_model: YOLOv5 model for object detection.
 
         Returns:
-            tuple: A tuple containing the processed image with bounding boxes and the predicted brand name.
+            tuple: A tuple containing the processed image with bounding boxes and the predicted brand names.
         """
         results = yolov5_model(image)
         pred_boxes = results.xyxy[0].detach().numpy()
@@ -30,14 +30,13 @@ class BrandService:
 
         # Looping through every box detection, identifying coordicates, drawing a box and displaying class name (and returning back the image with class name)
         image_drawn = image.copy()
+
         for box in pred_boxes:
             xmin, ymin, xmax, ymax, conf, cls = box
-            print("xmin", xmin, "ymin", ymin, "xmax", xmax, "ymax", ymax) 
             xmin, ymin, xmax, ymax = int(xmin), int(ymin), int(xmax), int(ymax)
 
             # Class recognition
             class_name = class_labels[int(cls)]
-            print("Brand detected:", class_name)
 
             class_names.append(class_name)
 
@@ -61,7 +60,10 @@ class BrandService:
         """
         video = cv2.VideoCapture(video_path)
 
+        total_frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
         processed_frames = []
+
+        frame_count = 0
 
         while ret := video.grab():
             # Retrieve the grabbed frame
@@ -70,12 +72,20 @@ class BrandService:
                 break
 
             # Perform object detection and retrieve processed frame with bounding boxes and class names
-            processed_frame, _ = self.brand_predict(frame, yolov5_model)
+            processed_frame, class_names = self.brand_predict(frame, yolov5_model)
+           
+            frame_count += 1
+
+            # Prints to show progress in the console
+            if len(class_names) == 0:
+                print(f"Processing frame ({frame_count}/{total_frames}): no detections found")
+            else:
+                print(f"Processing frame ({frame_count}/{total_frames}): {' '.join(class_names)}")
             
             processed_frames.append(processed_frame)
 
         # Release the video capture object
         video.release()
-        print('Video processing completed')
+        print('Brand video has been processed!')
 
         return processed_frames
